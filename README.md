@@ -32,7 +32,7 @@ We gathered 22 dataset archives from Roboflow/Google Drive. When we inspected th
 * **Extreme class imbalance:** Some field images had tiny background weeds labeled, and there were 70x more sunflower boxes than dandelion/tulip boxes.
 
 **Our Solution (`prepare_dataset.py`):** 
-We wrote an automated Python script that removes duplicate archives, converts all polygons into standard YOLO bounding boxes, maps all synonyms and the 86 rose breeds into our 5 main classes, filters out microscopic noise boxes (`area < 0.25%`), and balances every class equally (`2,000` images per class $\rightarrow$ `10,000` total clean images).
+We wrote an automated Python script that removes duplicate archives, converts all polygons into standard YOLO bounding boxes, maps all synonyms and the 86 rose breeds into our 5 main classes, filters out microscopic noise boxes (`area < 0.25%`), and balances every class equally (`2,000` images per class -> `10,000` total clean images).
 
 ### 2. Cloud GPU Crashes (`Kernel Died` / Shared Memory Error)
 When we first tried training on a cloud server with `imgsz=1024`, `batch=128`, and `workers=8`, JupyterLab kept crashing with `Kernel Died` errors because Docker containers have limited shared RAM (`/dev/shm`), and upscaling small images to 1024p caused catastrophic forgetting.
@@ -70,7 +70,7 @@ If you want to reproduce this project from scratch, you will need a cloud GPU be
 Here is exactly how you can set up the same environment:
 
 ### Step 1: Renting the GPU
-1. Go to [RunPod.io](https://www.runpod.io/) and create an account.
+1. Go to RunPod.io and create an account.
 2. Go to **Pods** -> **Deploy**.
 3. Select **Secure Cloud** (or Community Cloud for cheaper rates).
 4. Choose an **NVIDIA A40** or **RTX 3090 / 4090** (We need at least 12GB+ VRAM, A40 has 48GB which is perfect).
@@ -90,8 +90,50 @@ Run these commands in your RunPod JupyterLab terminal:
 
 ```bash
 # 1. Clone this repository
-git clone [https://github.com/YOUR_USERNAME/Flower-Detection-YOLOv26.git](https://github.com/YOUR_USERNAME/Flower-Detection-YOLOv26.git)
+git clone https://github.com/nasabaxx/Flower-Detection-YOLOv26.git
 cd Flower-Detection-YOLOv26
 
 # 2. Install required Python libraries
 pip install -r requirements.txt
+```
+
+### Step 4: Fetching and Cleaning the Dataset
+We use `gdown` to download the raw dataset archives directly from our Google Drive to the RunPod server. Run these commands inside the `Flower-Detection-YOLOv26` directory:
+
+```bash
+# Download raw ZIP archives into the total_dataset folder
+gdown --folder https://drive.google.com/drive/folders/1xpbi9BJMLVrpwgXfZe90wDCOpa0gNmiN?usp=sharing -O /workspace/total_dataset
+
+# Run the automated merger, deduplicator, and class balancer
+python prepare_dataset.py
+```
+*This script will take a few minutes. It will extract everything and create a clean, balanced dataset inside `/workspace/curated_dataset`.*
+
+### Step 5: Training the Model
+Now that the data is ready, start the hardware-aware YOLOv26 Nano training by running:
+
+```bash
+python train.py
+```
+*(Training takes about 1.2 hours on an A40 GPU. Once finished, your weights will be saved as `best.pt` in the `runs/` folder.)*
+
+---
+
+## 💻 Running Inference Locally (Testing the Model)
+
+If you don't want to train the model and just want to test our pre-trained weights (`weights/best.pt`) on your own computer:
+
+1. Clone this repo and install requirements:
+```bash
+git clone https://github.com/nasabaxx/Flower-Detection-YOLOv26.git
+cd Flower-Detection-YOLOv26
+pip install -r requirements.txt
+```
+
+2. Run the prediction script on any image:
+```bash
+python predict.py --source path/to/your_flower_photo.jpg --weights weights/best.pt
+```
+The model will output the detected flowers with bounding boxes and save the image in the `runs/detect/predict/` folder!
+
+
